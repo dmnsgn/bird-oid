@@ -1,0 +1,596 @@
+import SimplexNoise from "simplex-noise";
+
+import {
+  Clock,
+  WebGLRenderer,
+  Scene,
+  PerspectiveCamera,
+  Object3D,
+  Vector3,
+  Quaternion,
+  InstancedBufferAttribute,
+  CylinderBufferGeometry,
+  BoxBufferGeometry,
+  SphereGeometry,
+  SphereBufferGeometry,
+  MeshNormalMaterial,
+  MeshBasicMaterial,
+  InstancedMesh,
+  Mesh,
+  BoxHelper,
+  AxesHelper,
+  ArrowHelper,
+  VertexColors,
+  Color,
+  TubeBufferGeometry,
+  CurvePath,
+  LineCurve3,
+  DoubleSide
+} from "three";
+
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+
+import VectorField from "vector-field";
+
+import * as dat from "dat.gui";
+
+import {
+  System as BoidSystem,
+  Boid,
+  Obstacle,
+  behaviors,
+  Path
+} from "./index.js";
+
+const system = new BoidSystem({
+  maxSpeed: 0.9,
+  maxForce: 0.8
+});
+const systemHalfScale = system.scale * 0.5;
+const clock = new Clock();
+
+const ENTITIES = {
+  targets: [],
+  boids: [],
+  obstacles: []
+};
+
+// Add target boid
+const WANDER_SPEED = 2;
+const targetWanderBehavior = {
+  fn: behaviors.wander,
+  options: {
+    distance: system.scale * 0.04,
+    radius: system.scale * 0.3,
+    theta: 0,
+    phi: 0.3
+  }
+};
+const targetBoid = new Boid([
+  targetWanderBehavior,
+  { fn: behaviors.boundsConstrain, scale: 1 }
+]);
+targetBoid.position = system.getRandomPosition();
+system.addBoid(targetBoid);
+ENTITIES.targets.push(targetBoid);
+
+// FLOW FIELD
+const tempDirection = new Vector3();
+const tempColor = new Color();
+
+const simplex = new SimplexNoise(Math.random);
+function noiseFn([x, y, z], [stepX, stepY, stepZ]) {
+  const scale = 0.5;
+
+  let n =
+    simplex.noise4D(x * scale, y * scale, z * scale, 0.05 * clock.elapsedTime) *
+    Math.PI *
+    2;
+  const theta = n;
+  const phi = n;
+
+  const direction = [
+    Math.sin(theta) * Math.sin(phi),
+    Math.cos(theta),
+    Math.sin(theta) * Math.cos(phi)
+  ];
+
+  const mesh = this.field[stepX][stepY][stepZ].mesh;
+
+  if (mesh) {
+    mesh.setDirection(tempDirection.fromArray(direction));
+    mesh.setColor(tempColor.fromArray([...direction, 1]));
+  }
+
+  return direction;
+}
+const flowField = new VectorField(noiseFn, 12, system.scale);
+flowField.update();
+
+const pathPointsCount = 5;
+const path = new Path(
+  Array.from({ length: pathPointsCount }, (_, i) => {
+    const offset = Math.random() * system.scale * 0.25;
+    const radius = systemHalfScale * 0.75;
+
+    const theta = (0.8 * i) / (pathPointsCount - 1);
+    return [
+      radius * Math.cos(theta * Math.PI * 2),
+      offset,
+      radius * Math.sin(theta * Math.PI * 2)
+    ];
+  }),
+  system.scale * 0.03
+);
+
+// Config
+const CONFIG = {
+  cameraFollowTarget: false,
+  entities: {
+    boids: {
+      enabled: true,
+      count: 200
+    },
+    targets: {
+      enabled: true,
+      count: 1
+    },
+    obstacles: {
+      enabled: false,
+      count: 30
+    }
+  },
+  behaviors: [
+    {
+      enabled: false,
+      fn: behaviors.seek,
+      scale: 1,
+      options: {
+        target: [0, 0, 0]
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.flee,
+      scale: 1,
+      options: {
+        target: [0, 0, 0]
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.pursue,
+      scale: 1,
+      options: {
+        target: targetBoid.position,
+        targetVelocity: targetBoid.velocity
+      }
+    },
+    {
+      enabled: true,
+      fn: behaviors.evade,
+      scale: 1,
+      options: {
+        target: targetBoid.position,
+        targetVelocity: targetBoid.velocity
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.arrive,
+      scale: 1,
+      options: {
+        radius: system.scale * 1
+      }
+    },
+    {
+      enabled: true,
+      fn: behaviors.avoidObstacles,
+      scale: 4,
+      options: {
+        maxAvoidForce: system.scale * 2,
+        obstacles: ENTITIES.obstacles
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.wander,
+      scale: 1,
+      options: {
+        distance: system.scale * 0.04,
+        radius: system.scale * 0.3,
+        theta: 0,
+        phi: 0.2
+      }
+    },
+    {
+      enabled: true,
+      fn: behaviors.followPath,
+      scale: 1,
+      options: {
+        path,
+        maxSpeed: 0.3,
+        maxForce: 0.4
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.followFlowFieldSimple,
+      scale: 1,
+      options: {
+        flowField
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.followFlowField,
+      scale: 1,
+      options: {
+        flowField
+      }
+    },
+    {
+      enabled: true,
+      fn: behaviors.separate,
+      scale: 1,
+      options: {
+        maxDistance: system.scale * 0.04
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.cohere,
+      scale: 1,
+      options: {
+        maxDistance: system.scale * 0.04
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.align,
+      scale: 1,
+      options: {
+        maxDistance: system.scale * 0.04
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.flock,
+      scale: 1,
+      options: {
+        maxDistance: system.scale * 0.09
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.followLeaderSimple,
+      scale: 1,
+      options: {
+        leader: targetBoid,
+        distance: system.scale * 0.04,
+        radius: system.scale * 0.3
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.followLeader,
+      scale: 1,
+      options: {
+        leader: targetBoid,
+        distance: system.scale * 0.04,
+        radius: system.scale * 0.3
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.boundsConstrain,
+      scale: 2
+    },
+    {
+      enabled: true,
+      fn: behaviors.sphereConstrain,
+      scale: 2,
+      options: {
+        radius: systemHalfScale
+      }
+    },
+    {
+      enabled: false,
+      fn: behaviors.boundsWrapConstrain
+    },
+    {
+      enabled: false,
+      fn: behaviors.sphereWrapConstrain,
+      options: {
+        radius: systemHalfScale
+      }
+    }
+  ]
+};
+
+// GUI
+const gui = new dat.GUI();
+const systemFolder = gui.addFolder("System");
+systemFolder.add(system, "scale", 0, 10);
+systemFolder.add(system, "maxSpeed", 0, 10);
+systemFolder.add(system, "maxForce", 0, 10);
+systemFolder.add(CONFIG, "cameraFollowTarget");
+systemFolder.add(CONFIG.entities.boids, "enabled").name("Boids");
+systemFolder.add(CONFIG.entities.targets, "enabled").name("Targets");
+systemFolder.add(CONFIG.entities.obstacles, "enabled").name("Obstacles");
+
+for (let i = 0; i < CONFIG.behaviors.length; i++) {
+  const behavior = CONFIG.behaviors[i];
+  const name = behavior.fn.name;
+  const behaviorFolder = gui.addFolder(name);
+  // behaviorFolder.open();
+  behaviorFolder.add(behavior, "enabled");
+  if (behavior.scale) behaviorFolder.add(behavior, "scale");
+}
+
+// SCENE
+const tempObject = new Object3D();
+const tempQuaternion = new Quaternion();
+const renderer = new WebGLRenderer();
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+const scene = new Scene();
+const camera = new PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+Object.assign(camera.position, {
+  x: 0.5,
+  y: 0.5,
+  z: 1.5
+});
+const controls = new OrbitControls(camera, renderer.domElement);
+Object.assign(controls, {
+  enableDamping: true,
+  dampingFactor: 0.05,
+  screenSpacePanning: false,
+  maxDistance: 50
+});
+
+// ENTITIES
+const getBoidGeometry = () => {
+  const geometry = new CylinderBufferGeometry(0, 0.01, 0.03, 3, 1);
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
+};
+
+const boidsMesh = new InstancedMesh(
+  getBoidGeometry(),
+  new MeshNormalMaterial(),
+  CONFIG.entities.boids.count
+);
+scene.add(boidsMesh);
+
+const targetMesh = new InstancedMesh(
+  getBoidGeometry(),
+  new MeshBasicMaterial({ color: 0x00ff00 }),
+  CONFIG.entities.targets.count
+);
+scene.add(targetMesh);
+
+const obstacleGeometry = new SphereBufferGeometry(1);
+const colorBuffer = new Float32Array(CONFIG.entities.obstacles.count * 3);
+for (let i = 0; i < CONFIG.entities.obstacles.count; i++) {
+  colorBuffer[i * 3 + 0] = 1;
+  colorBuffer[i * 3 + 1] = Math.random();
+  colorBuffer[i * 3 + 2] = 0;
+}
+obstacleGeometry.setAttribute(
+  "color",
+  new InstancedBufferAttribute(colorBuffer, 3)
+);
+
+const obstacleMaterial = new MeshBasicMaterial();
+obstacleMaterial.vertexColors = VertexColors;
+
+const obstacleMesh = new InstancedMesh(
+  obstacleGeometry,
+  obstacleMaterial,
+  CONFIG.entities.obstacles.count
+);
+scene.add(obstacleMesh);
+
+// INIT SYSTEM
+for (let i = 0; i < CONFIG.entities.boids.count; i++) {
+  const boid = new Boid(CONFIG.behaviors);
+  boid.position = system.getRandomPosition();
+  boid.velocity = [
+    Math.random() * 0.5 * system.maxSpeed,
+    Math.random() * 0.5 * system.maxSpeed,
+    Math.random() * 0.5 * system.maxSpeed
+  ];
+  system.addBoid(boid);
+  ENTITIES.boids.push(boid);
+}
+
+for (let i = 0; i < CONFIG.entities.obstacles.count; i++) {
+  const radius = system.scale * 0.025 + Math.random() * system.scale * 0.025;
+  const obstacle = new Obstacle(system.getRandomPosition(), radius);
+  ENTITIES.obstacles.push(obstacle);
+}
+
+// DEBUG
+const debugMeshes = new Object3D();
+const debugFolder = gui.addFolder("Debug");
+debugFolder.add(debugMeshes, "visible").name("all");
+
+const debugAxes = new AxesHelper(1);
+debugFolder.add(debugAxes, "visible").name("axes");
+debugMeshes.add(debugAxes);
+
+const debugBounds = new BoxHelper(
+  new Mesh(
+    new BoxBufferGeometry(system.scale, system.scale, system.scale),
+    new MeshBasicMaterial()
+  ),
+  0xffffff
+);
+debugBounds.visible = false;
+debugFolder.add(debugBounds, "visible").name("bounds");
+debugMeshes.add(debugBounds);
+
+const debugSphereBounds = new Mesh(
+  new SphereGeometry(systemHalfScale),
+  new MeshBasicMaterial({
+    color: 0xffffff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.2
+  })
+);
+// debugBounds.visible = false;
+debugFolder.add(debugSphereBounds, "visible").name("sphere bounds");
+debugMeshes.add(debugSphereBounds);
+
+const curvePath = new CurvePath();
+for (let i = 1; i < path.points.length; i++) {
+  const prev = path.points[i - 1];
+  const current = path.points[i];
+  curvePath.add(
+    new LineCurve3(
+      new Vector3().fromArray(prev),
+      new Vector3().fromArray(current)
+    )
+  );
+}
+
+const debugPath = new Mesh(
+  new TubeBufferGeometry(curvePath, path.points.length, path.radius, 8, false),
+  new MeshBasicMaterial({
+    color: 0xffffff,
+    wireframe: true,
+    side: DoubleSide
+  })
+);
+debugPath.visible = false;
+debugFolder.add(debugPath, "visible").name("path");
+debugMeshes.add(debugPath);
+
+const debugFlowField = new Object3D();
+for (let x = 0; x < flowField.steps[0]; x++) {
+  for (let y = 0; y < flowField.steps[1]; y++) {
+    for (let z = 0; z < flowField.steps[2]; z++) {
+      const mesh = new ArrowHelper(
+        tempDirection.fromArray(flowField.field[x][y][z].direction),
+        new Vector3()
+          .fromArray(flowField.field[x][y][z].position)
+          .sub(new Vector3(systemHalfScale, systemHalfScale, systemHalfScale)),
+        system.scale * 0.05,
+        0xffffff
+      );
+      debugFlowField.add(mesh);
+      flowField.field[x][y][z].mesh = mesh;
+    }
+  }
+}
+debugFlowField.visible = false;
+debugFolder.add(debugFlowField, "visible").name("field");
+debugMeshes.add(debugFlowField);
+scene.add(debugMeshes);
+
+// LOOP
+const frame = () => {
+  const dt = Math.min(0.1, clock.getDelta());
+
+  // System
+  system.update(dt);
+
+  // Flow field
+  flowField.update(); // See noiseFn for debug meshes update
+
+  // Obstacles
+  // TODO: CONFIG.obstaclesMoving
+  obstacleMesh.visible = CONFIG.entities.obstacles.enabled;
+  if (obstacleMesh.visible) {
+    for (let i = 0; i < ENTITIES.obstacles.length; i++) {
+      const obstacle = ENTITIES.obstacles[i];
+      tempObject.position.set(...obstacle.position);
+      tempObject.rotation.set(0, 0, 0);
+      tempObject.scale.set(obstacle.radius, obstacle.radius, obstacle.radius);
+      tempObject.updateMatrix();
+      obstacleMesh.setMatrixAt(i, tempObject.matrix);
+    }
+    obstacleMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  tempObject.scale.set(1, 1, 1);
+
+  // Target
+  const configWanderBehavior = CONFIG.behaviors.find(
+    behavior => behavior.fn.name === "wander"
+  );
+  configWanderBehavior.options.theta +=
+    Math.random() * WANDER_SPEED - WANDER_SPEED * 0.5;
+  configWanderBehavior.options.phi +=
+    Math.random() * WANDER_SPEED - WANDER_SPEED * 0.5;
+  targetWanderBehavior.options.theta +=
+    Math.random() * WANDER_SPEED - WANDER_SPEED * 0.5;
+  targetWanderBehavior.options.phi +=
+    Math.random() * WANDER_SPEED - WANDER_SPEED * 0.5;
+
+  targetMesh.visible = CONFIG.entities.targets.enabled;
+  if (targetMesh.visible) {
+    for (let i = 0; i < ENTITIES.targets.length; i++) {
+      const target = ENTITIES.targets[i];
+      tempObject.position.set(...target.position);
+      tempObject.rotation.setFromQuaternion(
+        tempQuaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          new Vector3(...target.velocity).normalize()
+        )
+      );
+      tempObject.updateMatrix();
+      targetMesh.setMatrixAt(i, tempObject.matrix);
+    }
+    targetMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // Boids
+  boidsMesh.visible = CONFIG.entities.boids.enabled;
+  if (boidsMesh.visible) {
+    for (let i = 0; i < ENTITIES.boids.length; i++) {
+      const boid = ENTITIES.boids[i];
+      tempObject.position.set(...boid.position);
+      tempObject.rotation.setFromQuaternion(
+        tempQuaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          new Vector3(...boid.velocity).normalize()
+        )
+      );
+      tempObject.updateMatrix();
+      boidsMesh.setMatrixAt(i, tempObject.matrix);
+    }
+    boidsMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  if (CONFIG.cameraFollowTarget) {
+    camera.lookAt(new Vector3().fromArray(targetBoid.position));
+  }
+
+  renderer.render(scene, camera);
+  controls.update();
+
+  requestAnimationFrame(frame);
+};
+
+// Kick off
+requestAnimationFrame(() => {
+  document.body.appendChild(renderer.domElement);
+  clock.start();
+  frame();
+});
+
+// Events
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
