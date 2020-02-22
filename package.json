@@ -1,6 +1,6 @@
 {
   "name": "bird-oid",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A 3D boid system with accompanying emergent behaviors. Implementation mostly based on Craig Reynolds paper Steering Behaviors For Autonomous Characters.",
   "main": "index.js",
   "type": "module",
