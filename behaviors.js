@@ -483,7 +483,7 @@ export function flock({ boids, maxDistance, position, velocity, maxSpeed }) {
   if (cohesion) vec3.add(steering, steering, cohesion);
 
   const alignment = align({ boids, maxDistance, position, velocity, maxSpeed });
-  if (alignment) vec3.add(steering, steering, steering);
+  if (alignment) vec3.add(steering, steering, alignment);
 
   return steering;
 }

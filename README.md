@@ -46,7 +46,7 @@ const boidBehaviors = [
 		scale: 2
 	},
 	{
-		enabled: true,
+		enabled: false,
 		fn: behaviors.boundsWrapConstrain
 	}
 ];
