@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "dat.gui": "./dat.gui.js",
+    "es-module-shims": "./es-module-shims.js",
+    "gl-matrix": "./gl-matrix.js",
+    "simplex-noise": "./simplex-noise.js",
+    "three": "./three.js",
+    "vector-field": "./vector-field.js"
+  }
+}

@@ -1,3 +1,11 @@
+/**
+ * @module behaviors
+ *
+ * @description
+ * Steering based on https://www.red3d.com/cwr/steer/gdc99/
+ * Use these function as `fn` property of the `BehaviorObject` passed to a `Boid`.
+ */
+
 import { vec3 } from "gl-matrix";
 import { limit } from "./utils.js";
 
@@ -12,10 +20,14 @@ const checkPositionsInSphere = (target1, target2, center, radius) =>
   vec3.distance(center, target1) <= radius ||
   vec3.distance(center, target2) <= radius;
 
-// Steering based on https://www.red3d.com/cwr/steer/gdc99/
 // BASICS
 // desired_velocity = normalize (position - target) * max_speed
 // steering = desired_velocity - velocity
+/**
+ * "Seek (or pursuit of a static target) acts to steer the character towards a specified position in global space."
+ * @param {import("../types.js").BasicBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function seek({ position, target, velocity, maxSpeed }) {
   const steering = vec3.create();
   vec3.sub(steering, target, position);
@@ -26,7 +38,11 @@ export function seek({ position, target, velocity, maxSpeed }) {
   return vec3.sub(steering, steering, velocity);
 }
 
-// "Flee is simply the inverse of seek and acts to steer the character so that its velocity is radially aligned away from the target. The desired velocity points in the opposite direction."
+/**
+ * "Flee is simply the inverse of seek and acts to steer the character so that its velocity is radially aligned away from the target. The desired velocity points in the opposite direction."
+ * @param {import("../types.js").BasicBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function flee(options) {
   const steering = seek(options);
   return vec3.negate(steering, steering);
@@ -42,13 +58,17 @@ const getPredictedPosition = (position, target, targetVelocity, maxSpeed) => {
   return vec3.add(predictedTarget, target, predictedTarget);
 };
 
-// "Pursuit is similar to seek except that the quarry (target) is another moving character. [...] The position of a character T units of time in the future (assuming it does not maneuver) can be obtained by scaling its velocity by T and adding that offset to its current position. Steering for pursuit is then simply the result of applying the seek steering behavior to the predicted target location."
+/**
+ * "Pursuit is similar to seek except that the quarry (target) is another moving character. [...] The position of a character T units of time in the future (assuming it does not maneuver) can be obtained by scaling its velocity by T and adding that offset to its current position. Steering for pursuit is then simply the result of applying the seek steering behavior to the predicted target location."
+ * @param {import("../types.js").ExtendedBasicBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function pursue({
   position,
   target,
   velocity,
   targetVelocity,
-  maxSpeed
+  maxSpeed,
 }) {
   const predictedTarget = getPredictedPosition(
     position,
@@ -60,13 +80,17 @@ export function pursue({
   return seek({ position, target: predictedTarget, velocity, maxSpeed });
 }
 
-// "Evasion is analogous to pursuit, except that flee is used to steer away from the predicted future position of the target character."
+/**
+ * "Evasion is analogous to pursuit, except that flee is used to steer away from the predicted future position of the target character."
+ * @param {import("../types.js").ExtendedBasicBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function evade({
   position,
   target,
   velocity,
   targetVelocity,
-  maxSpeed
+  maxSpeed,
 }) {
   const predictedTarget = getPredictedPosition(
     position,
@@ -78,7 +102,6 @@ export function evade({
   return flee({ position, target: predictedTarget, velocity, maxSpeed });
 }
 
-// "Arrival behavior is identical to seek while the character is far from its target. But instead of moving through the target at full speed, this behavior causes the character to slow down as it approaches the target, eventually slowing to a stop coincident with the target"
 // target_offset = target - position
 // distance = length (target_offset)
 // ramped_speed = max_speed * (distance / slowing_distance)
@@ -86,6 +109,11 @@ export function evade({
 // desired_velocity = (clipped_speed / distance) * target_offset
 // steering = desired_velocity - velocity
 
+/**
+ * "Arrival behavior is identical to seek while the character is far from its target. But instead of moving through the target at full speed, this behavior causes the character to slow down as it approaches the target, eventually slowing to a stop coincident with the target"
+ * @param {BasicWithRadiusBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function arrive({ position, target, velocity, maxSpeed, radius }) {
   const steering = vec3.create();
   const desiredVelocity = vec3.create();
@@ -104,8 +132,6 @@ export function arrive({ position, target, velocity, maxSpeed, radius }) {
 }
 
 // OBSTACLES
-// "The implementation of obstacle avoidance behavior described here will make a simplifying assumption that both the character and obstacle can be reasonably approximated as spheres, although the basic concept can be easily extend to more precise shape models. [...] It is convenient to consider the geometrical situation from the character’s local coordinate system. The goal of the behavior is to keep an imaginary cylinder of free space in front of the character. The cylinder lies along the character’s forward axis, has a diameter equal to the character’s bounding sphere, and extends from the character’s center for a distance based on the character’s speed and agility. An obstacle further than this distance away is not an immediate threat. The obstacle avoidance behavior considers each obstacle in turn (perhaps using a spatial portioning scheme to cull out distance obstacles) and determines if they intersect with the cylinder. By localizing the center of each spherical obstacle, the test for non-intersection with the cylinder is very fast. The local obstacle center is projected onto the side-up plane (by setting its forward coordinate to zero) if the 2D distance from that point to the local origin is greater than the sum of the radii of the obstacle and the character, then there is no potential collision. Similarly obstacles which are fully behind the character, or fully ahead of the cylinder, can be quickly rejected. For any remaining obstacles a line-sphere intersection calculation is performed. The obstacle which intersects the forward axis nearest the character is selected as the “most threatening.” Steering to avoid this obstacle is computed by negating the (lateral) side-up projection of the obstacle’s center.
-
 const findClosestObstacle = (
   position,
   obstacles,
@@ -138,13 +164,18 @@ const findClosestObstacle = (
   return closestObstacle;
 };
 
+/**
+ * "The implementation of obstacle avoidance behavior described here will make a simplifying assumption that both the character and obstacle can be reasonably approximated as spheres, although the basic concept can be easily extend to more precise shape models. [...] It is convenient to consider the geometrical situation from the character’s local coordinate system. The goal of the behavior is to keep an imaginary cylinder of free space in front of the character. The cylinder lies along the character’s forward axis, has a diameter equal to the character’s bounding sphere, and extends from the character’s center for a distance based on the character’s speed and agility. An obstacle further than this distance away is not an immediate threat. The obstacle avoidance behavior considers each obstacle in turn (perhaps using a spatial portioning scheme to cull out distance obstacles) and determines if they intersect with the cylinder. By localizing the center of each spherical obstacle, the test for non-intersection with the cylinder is very fast. The local obstacle center is projected onto the side-up plane (by setting its forward coordinate to zero) if the 2D distance from that point to the local origin is greater than the sum of the radii of the obstacle and the character, then there is no potential collision. Similarly obstacles which are fully behind the character, or fully ahead of the cylinder, can be quickly rejected. For any remaining obstacles a line-sphere intersection calculation is performed. The obstacle which intersects the forward axis nearest the character is selected as the “most threatening.” Steering to avoid this obstacle is computed by negating the (lateral) side-up projection of the obstacle’s center.
+ * @param {ObstacleBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function avoidObstacles({
   position,
   velocity,
   obstacles,
   maxSpeed,
   maxAvoidForce,
-  fixedDistance = false
+  fixedDistance = false,
 }) {
   const steering = vec3.create();
 
@@ -181,11 +212,14 @@ export function avoidObstacles({
 }
 
 // WANDER
-// "The steering force takes a “random walk” from one direction to another. This idea [...] is to constrain the steering force to the surface of a sphere located slightly ahead of the character. To produce the steering force for the next frame: a random displacement is added to the previous value, and the sum is constrained again to the sphere’s surface. The sphere’s radius [...] determines the maximum wandering “strength” and the magnitude of the random displacement [...] determines the wander “rate.”"
-
-// Note: Don't forget to update theta and phi angles: angle += Math.random() * WANDER_SPEED - WANDER_SPEED * 0.5;
 // TODO: noise
 
+/**
+ * "The steering force takes a “random walk” from one direction to another. This idea [...] is to constrain the steering force to the surface of a sphere located slightly ahead of the character. To produce the steering force for the next frame: a random displacement is added to the previous value, and the sum is constrained again to the sphere’s surface. The sphere’s radius [...] determines the maximum wandering “strength” and the magnitude of the random displacement [...] determines the wander “rate.”"
+ * Note: Don't forget to update theta and phi angles: angle += Math.random() * WANDER_SPEED - WANDER_SPEED * 0.5;
+ * @param {WanderBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function wander({ velocity, distance, radius, theta, phi }) {
   const steering = vec3.create();
 
@@ -224,12 +258,17 @@ const projectScalar = (position, currentPoint, nextPoint) => {
 };
 
 // TODO: could this have another version following next point in path?
+/**
+ * "Path following behavior enables a character to steer along a predetermined path, such as a roadway, corridor or tunnel."
+ * @param {FollowPathBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function followPath({
   path,
   position,
   velocity,
   maxSpeed,
-  fixedDistance = false
+  fixedDistance = false,
 }) {
   // "To compute steering for path following, a velocity-based prediction is made of the character’s future position."
   const predictedPosition = vec3.create();
@@ -240,7 +279,7 @@ export function followPath({
   );
 
   let target;
-  let segmentDirection = vec3.create();
+  // let segmentDirection = vec3.create();
   let smallestDistanceToPath = Infinity;
 
   for (let i = 0; i < path.points.length; i++) {
@@ -270,13 +309,16 @@ export function followPath({
   }
 }
 
-// In flow field following behavior the character steers to align its motion with the local tangent of a flow field (also known as a force field or a vector field). [...] The future position of a character is estimated and the flow field is sampled at that location. This flow direction [...] is the “desired velocity” and the steering direction (vector S) is simply the difference between the current velocity (vector V) and the desired velocity.
-
+/**
+ * "In flow field following behavior the character steers to align its motion with the local tangent of a flow field (also known as a force field or a vector field). [...] The future position of a character is estimated and the flow field is sampled at that location. This flow direction [...] is the “desired velocity” and the steering direction (vector S) is simply the difference between the current velocity (vector V) and the desired velocity."
+ * @param {FollowFlowFieldSimpleBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function followFlowFieldSimple({
   flowField,
   position,
   velocity,
-  maxSpeed
+  maxSpeed,
 }) {
   const localTangent = flowField.lookup(position);
 
@@ -288,12 +330,16 @@ export function followFlowFieldSimple({
   }
 }
 
+/**
+ * @param {FollowFlowFieldBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function followFlowField({
   flowField,
   position,
   velocity,
   maxSpeed,
-  fixedDistance = false
+  fixedDistance = false,
 }) {
   const predictedOffset = getPredictedOffsetFromVelocity(
     velocity,
@@ -314,14 +360,18 @@ export function followFlowField({
   }
 }
 
-// "Leader following behavior causes one or more character to follow another moving character designated as the leader. Generally the followers want to stay near the leader, without crowding the leader, and taking care to stay out of the leader’s way (in case they happen to find them selves in front of the leader). In addition, if there is more than one follower, they want to avoid bumping each other. The implementation of leader following relies on arrival behavior (see above) a desire to move towards a point, slowing as it draws near. The arrival target is a point offset slightly behind the leader. (The offset distance might optionally increases with speed.) If a follower finds itself in a rectangular region in front of the leader, it will steer laterally away from the leader’s path before resuming arrival behavior. In addition the followers use separation behavior to prevent crowding each other."
+/**
+ * "Leader following behavior causes one or more character to follow another moving character designated as the leader. Generally the followers want to stay near the leader, without crowding the leader, and taking care to stay out of the leader’s way (in case they happen to find them selves in front of the leader). In addition, if there is more than one follower, they want to avoid bumping each other. The implementation of leader following relies on arrival behavior (see above) a desire to move towards a point, slowing as it draws near. The arrival target is a point offset slightly behind the leader. (The offset distance might optionally increases with speed.) If a follower finds itself in a rectangular region in front of the leader, it will steer laterally away from the leader’s path before resuming arrival behavior. In addition the followers use separation behavior to prevent crowding each other."
+ * @param {FollowLeaderSimpleBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function followLeaderSimple({
   leader,
   position,
   velocity,
   maxSpeed,
   distance,
-  radius
+  radius,
 }) {
   const target = vec3.clone(leader.velocity);
 
@@ -332,7 +382,11 @@ export function followLeaderSimple({
   return arrive({ position, target, velocity, maxSpeed, radius });
 }
 
-// Notes: next behaviour should be a separation
+/**
+ * Notes: next behaviour should be a separation
+ * @param {FollowLeaderBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function followLeader({
   leader,
   position,
@@ -341,7 +395,7 @@ export function followLeader({
   distance,
   radius,
   evadeScale = 1,
-  arriveScale = 1
+  arriveScale = 1,
 }) {
   const steering = vec3.create();
 
@@ -367,7 +421,7 @@ export function followLeader({
         target: leader.position,
         velocity,
         targetVelocity: leader.velocity,
-        maxSpeed
+        maxSpeed,
       }),
       evadeScale
     );
@@ -381,7 +435,7 @@ export function followLeader({
       target: leader.position,
       velocity,
       maxSpeed,
-      radius
+      radius,
     }),
     arriveScale
   );
@@ -390,8 +444,11 @@ export function followLeader({
 }
 
 // GROUPS
-// To compute steering for separation, first a search is made to find other characters within the specified neighborhood. [...] For each nearby character, a repulsive force is computed by subtracting the positions of our character and the nearby character, normalizing, and then applying a 1/r weighting. (That is, the position offset vector is scaled by 1/r 2.) Note that 1/r is just a setting that has worked well, not a fundamental value. These repulsive forces for each nearby character are summed together to produce the overall steering force.
-
+/**
+ * "To compute steering for separation, first a search is made to find other characters within the specified neighborhood. [...] For each nearby character, a repulsive force is computed by subtracting the positions of our character and the nearby character, normalizing, and then applying a 1/r weighting. (That is, the position offset vector is scaled by 1/r 2.) Note that 1/r is just a setting that has worked well, not a fundamental value. These repulsive forces for each nearby character are summed together to produce the overall steering force."
+ * @param {GroupsBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function separate({ boids, maxDistance, position, velocity, maxSpeed }) {
   const steering = vec3.create();
 
@@ -415,8 +472,11 @@ export function separate({ boids, maxDistance, position, velocity, maxSpeed }) {
   }
 }
 
-// Cohesion steering behavior gives an character the ability to cohere with (approach and form a group with) other nearby characters. [...] Steering for cohesion can be computed by finding all characters in the local neighborhood (as described above for separation), computing the “average position” (or “center of gravity”) of the nearby characters. The steering force can applied in the direction of that “average position” (subtracting our character position from the average position, as in the original boids model), or it can be used as the target for seek steering behavior.
-
+/**
+ * "Cohesion steering behavior gives an character the ability to cohere with (approach and form a group with) other nearby characters. [...] Steering for cohesion can be computed by finding all characters in the local neighborhood (as described above for separation), computing the “average position” (or “center of gravity”) of the nearby characters. The steering force can applied in the direction of that “average position” (subtracting our character position from the average position, as in the original boids model), or it can be used as the target for seek steering behavior."
+ * @param {GroupsBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function cohere({ boids, maxDistance, position, velocity, maxSpeed }) {
   const steering = vec3.create();
 
@@ -439,8 +499,11 @@ export function cohere({ boids, maxDistance, position, velocity, maxSpeed }) {
   }
 }
 
-// Alignment steering behavior gives an character the ability to align itself with (that is, head in the same direction and/or speed as) other nearby characters [...]. Steering for alignment can be computed by finding all characters in the local neighborhood (as described above for separation), averaging together the velocity (or alternately, the unit forward vector) of the nearby characters. This average is the “desired velocity,” and so the steering vector is the difference between the average and our character’s current velocity (or alternately, its unit forward vector).
-
+/**
+ * "Alignment steering behavior gives an character the ability to align itself with (that is, head in the same direction and/or speed as) other nearby characters [...]. Steering for alignment can be computed by finding all characters in the local neighborhood (as described above for separation), averaging together the velocity (or alternately, the unit forward vector) of the nearby characters. This average is the “desired velocity,” and so the steering vector is the difference between the average and our character’s current velocity (or alternately, its unit forward vector)."
+ * @param {GroupsBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function align({ boids, maxDistance, position, velocity, maxSpeed }) {
   const steering = vec3.create();
 
@@ -467,6 +530,11 @@ export function align({ boids, maxDistance, position, velocity, maxSpeed }) {
   }
 }
 
+/**
+ * "[...] in addition to other applications, the separation, cohesion and alignment behaviors can be combined to produce the boids model of flocks, herds and schools"
+ * @param {GroupsBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function flock({ boids, maxDistance, position, velocity, maxSpeed }) {
   const steering = vec3.create();
 
@@ -475,7 +543,7 @@ export function flock({ boids, maxDistance, position, velocity, maxSpeed }) {
     maxDistance,
     position,
     velocity,
-    maxSpeed
+    maxSpeed,
   });
   if (separation) vec3.add(steering, steering, separation);
 
@@ -489,6 +557,11 @@ export function flock({ boids, maxDistance, position, velocity, maxSpeed }) {
 }
 
 // CONSTRAINTS
+/**
+ * Constraint in system bounds.
+ * @param {BoundsConstraintBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function boundsConstrain({
   center,
   bounds,
@@ -496,7 +569,7 @@ export function boundsConstrain({
   velocity,
   maxSpeed,
   maxForce,
-  fixedDistance = false
+  fixedDistance = false,
 }) {
   const desiredVelocity = vec3.create();
 
@@ -525,6 +598,11 @@ export function boundsConstrain({
   }
 }
 
+/**
+ * Constraint in sphere bounds.
+ * @param {SphereConstraintBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function sphereConstrain({
   center,
   radius,
@@ -532,7 +610,7 @@ export function sphereConstrain({
   velocity,
   maxSpeed,
   maxForce,
-  fixedDistance = false
+  fixedDistance = false,
 }) {
   const predictedPosition = vec3.create();
   vec3.add(
@@ -554,7 +632,11 @@ export function sphereConstrain({
 }
 
 // TODO: add random velocity in the right direction when respawn
-// Wrap for convenience (no velocity change)
+/**
+ * Wrap to opposite bound (no velocity change).
+ * @param {BoundsWrapConstraintBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function boundsWrapConstrain({ position, center, bounds }) {
   for (let i = 0; i < 3; i++) {
     const min = center[i] - bounds[i] * 0.5;
@@ -568,6 +650,11 @@ export function boundsWrapConstrain({ position, center, bounds }) {
   return false;
 }
 
+/**
+ * Wrap to opposite bound (no velocity change).
+ * @param {SphereWrapConstraintBehaviorOptions} options
+ * @returns {import("gl-matrix").vec3}
+ */
 export function sphereWrapConstrain({ position, center, radius }) {
   const distance = vec3.distance(center, position);
   if (distance > radius) {

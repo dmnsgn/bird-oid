@@ -2,8 +2,6 @@
   "name": "bird-oid",
   "version": "0.2.0",
   "description": "A 3D boid system with accompanying emergent behaviors. Implementation mostly based on Craig Reynolds paper Steering Behaviors For Autonomous Characters.",
-  "main": "index.js",
-  "type": "module",
   "keywords": [
     "3d",
     "boids",
@@ -15,59 +13,37 @@
     "flow-field",
     "steering"
   ],
-  "author": "Damien Seguin (https://github.com/dmnsgn)",
+  "homepage": "https://github.com/dmnsgn/bird-oid",
+  "bugs": "https://github.com/dmnsgn/bird-oid/issues",
+  "repository": "dmnsgn/bird-oid",
+  "funding": [
+    {
+      "type": "individual",
+      "url": "https://paypal.me/dmnsgn"
+    },
+    {
+      "type": "individual",
+      "url": "https://commerce.coinbase.com/checkout/56cbdf28-e323-48d8-9c98-7019e72c97f3"
+    }
+  ],
   "license": "MIT",
-  "scripts": {
-    "prepare": "npx snowpack",
-    "build": "npx snowpack --optimize"
-  },
+  "author": "dmnsgn (https://github.com/dmnsgn)",
+  "type": "module",
+  "exports": "./index.js",
+  "main": "index.js",
+  "types": "types/index.d.ts",
   "dependencies": {
-    "gl-matrix": "^3.1.0"
+    "gl-matrix": "^3.4.3"
   },
   "devDependencies": {
-    "dat.gui": "^0.7.6",
-    "es-module-shims": "^0.4.6",
-    "eslint": "^6.8.0",
-    "eslint-config-prettier": "^6.9.0",
-    "eslint-plugin-prettier": "^3.1.2",
-    "prettier": "^1.19.1",
-    "simplex-noise": "^2.4.0",
-    "snowpack": "^1.0.4",
-    "three": "^0.112.1",
-    "vector-field": "^1.0.0"
+    "dat.gui": "^0.7.9",
+    "es-module-shims": "^1.5.4",
+    "simplex-noise": "^3.0.1",
+    "three": "^0.139.2",
+    "vector-field": "^2.1.0"
   },
-  "snowpack": {
-    "webDependencies": [
-      "three",
-      "three/examples/jsm/controls/OrbitControls.js",
-      "dat.gui",
-      "es-module-shims",
-      "gl-matrix",
-      "simplex-noise",
-      "vector-field"
-    ]
-  },
-  "eslintConfig": {
-    "extends": [
-      "eslint:recommended",
-      "plugin:prettier/recommended"
-    ],
-    "plugins": [
-      "prettier"
-    ],
-    "rules": {
-      "prettier/prettier": "error"
-    },
-    "parserOptions": {
-      "ecmaVersion": 2020,
-      "sourceType": "module"
-    },
-    "env": {
-      "es6": true,
-      "browser": true
-    }
-  },
-  "eslintIgnore": [
-    "node_modules"
-  ]
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  }
 }
