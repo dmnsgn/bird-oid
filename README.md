@@ -289,7 +289,7 @@ Note: Don't forget to update theta and phi angles: angle += Math.random() _ WAND
 
 ### behaviors.followPath(options) ⇒ <code>module:gl-matrix~vec3</code>
 
-Path following behavior enables a character to steer along a predetermined path, such as a roadway, corridor or tunnel.
+"Path following behavior enables a character to steer along a predetermined path, such as a roadway, corridor or tunnel."
 
 **Kind**: static method of [<code>behaviors</code>](#module_behaviors)
 
@@ -419,7 +419,7 @@ Constraint in sphere bounds.
 
 ### behaviors.boundsWrapConstrain(options) ⇒ <code>module:gl-matrix~vec3</code>
 
-Wrap for convenience (no velocity change)
+Wrap to opposite bound (no velocity change).
 
 **Kind**: static method of [<code>behaviors</code>](#module_behaviors)
 
@@ -431,7 +431,7 @@ Wrap for convenience (no velocity change)
 
 ### behaviors.sphereWrapConstrain(options) ⇒ <code>module:gl-matrix~vec3</code>
 
-Wrap for convenience (no velocity change)
+Wrap to opposite bound (no velocity change).
 
 **Kind**: static method of [<code>behaviors</code>](#module_behaviors)
 
